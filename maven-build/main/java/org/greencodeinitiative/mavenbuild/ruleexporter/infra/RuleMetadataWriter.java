@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -56,19 +57,30 @@ public class RuleMetadataWriter {
 
     private JsonObject buildItem(Collection<RuleMetadata> rulesById) {
         RuleMetadata first = rulesById.iterator().next();
+
+        JsonObjectBuilder languagesBuilder = Json.createObjectBuilder();
+        rulesById.stream()
+                .sorted(Comparator.comparing(RuleMetadata::getTechnology))
+                .forEach(rule -> languagesBuilder.add(rule.getTechnology(), buildLanguageEntry(rule)));
+
         return Json.createObjectBuilder()
                 .add("id", first.getKey().toString())
                 .add("name", first.getTitle())
                 .add("severity", first.getSeverity().toString())
-                .add("technologies", extractAllProperties(rulesById, RuleMetadata::getTechnology))
-                .add("status", first.getStatus().toString())
+                .add("languages", languagesBuilder.build())
+                .build();
+    }
+
+    private JsonObject buildLanguageEntry(RuleMetadata rule) {
+        return Json.createObjectBuilder()
+                .add("status", rule.getStatus().toString())
                 .build();
     }
 
     private JsonObject buildMeta(Collection<RuleMetadata> rules) {
         String deploymentUrl = System.getenv("PAGES_DEPLOYMENT_URL");
         return Json.createObjectBuilder()
-                .add("technologies", extractAllPropertiesToMap(rules, rule -> Map.entry(
+                .add("languages", extractAllPropertiesToMap(rules, rule -> Map.entry(
                         rule.getTechnology(),
                         technologyLabels.getOrDefault(rule.getTechnology(), rule.getTechnology())
                 )))
@@ -93,7 +105,10 @@ public class RuleMetadataWriter {
         ).build();
     }
 
-    private JsonObject extractAllPropertiesToMap(Collection<RuleMetadata> rules, Function<RuleMetadata, Map.Entry<String, String>> mapper) {
+    private JsonObject extractAllPropertiesToMap(
+        Collection<RuleMetadata> rules,
+        Function<RuleMetadata, Map.Entry<String, String>> mapper
+    ) {
         JsonObjectBuilder builder = Json.createObjectBuilder();
         rules.stream()
                 .map(mapper)
